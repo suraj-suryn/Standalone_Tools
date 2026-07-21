@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API Mock Server</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    min-height: 100vh;
+  }
+
+  header {
+    background: #1e293b;
+    border-bottom: 1px solid #334155;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  header h1 { font-size: 1.25rem; font-weight: 700; color: #f1f5f9; }
+  header .subtitle { font-size: 0.8rem; color: #64748b; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+  /* Server Status Panel */
+  .server-panel {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+
+  .server-panel h2 { font-size: 0.9rem; color: #94a3b8; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: .05em;
+  }
+  .status-badge.running { background: #14532d; color: #4ade80; border: 1px solid #166534; }
+  .status-badge.stopped { background: #3b1515; color: #f87171; border: 1px solid #7f1d1d; }
+  .status-badge::before { content: '●'; font-size: 0.6rem; }
+
+  .port-group { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .port-group label { font-size: 0.85rem; color: #94a3b8; }
+
+  input[type="number"], input[type="text"], textarea, select {
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #e2e8f0;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.875rem;
+    outline: none;
+    transition: border-color .2s;
+  }
+  input[type="number"]:focus, input[type="text"]:focus, textarea:focus, select:focus {
+    border-color: #6366f1;
+  }
+
+  .btn {
+    padding: 8px 18px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity .2s, transform .1s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: #6366f1; color: #fff; }
+  .btn-danger  { background: #ef4444; color: #fff; }
+  .btn-success { background: #22c55e; color: #fff; }
+  .btn-outline { background: transparent; color: #94a3b8; border: 1px solid #334155; }
+  .btn-sm { padding: 4px 12px; font-size: 0.8rem; }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid #334155;
+    margin-bottom: 24px;
+  }
+  .tab-btn {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #64748b;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .tab-btn.active { color: #6366f1; border-bottom-color: #6366f1; }
+
+  /* Section card */
+  .card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+  .card h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 16px; color: #f1f5f9; }
+
+  /* Form grid */
+  .form-grid {
+    display: grid;
+    grid-template-columns: 110px 1fr 90px 1fr;
+    gap: 10px;
+    align-items: start;
+    margin-bottom: 12px;
+  }
+  .form-grid-full { grid-column: 1 / -1; }
+  .form-grid label { font-size: 0.78rem; color: #64748b; margin-bottom: 4px; display: block; }
+  .form-grid textarea { resize: vertical; min-height: 70px; width: 100%; font-family: monospace; font-size: 0.82rem; }
+  .form-grid select { width: 100%; }
+  .form-grid input { width: 100%; }
+
+  /* Actions bar */
+  .actions-bar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .actions-bar .spacer { flex: 1; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th {
+    text-align: left;
+    padding: 10px 12px;
+    background: #0f172a;
+    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    border-bottom: 1px solid #334155;
+  }
+  td { padding: 10px 12px; border-bottom: 1px solid #1e293b; vertical-align: middle; }
+  tr:hover td { background: #1a2540; }
+  .empty-row td { text-align: center; color: #475569; padding: 32px; }
+
+  /* Badges */
+  .method-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+  }
+  .GET    { background: #0c2a4a; color: #38bdf8; }
+  .POST   { background: #16291a; color: #4ade80; }
+  .PUT    { background: #2d2014; color: #fb923c; }
+  .DELETE { background: #2a1010; color: #f87171; }
+  .PATCH  { background: #21192d; color: #c084fc; }
+
+  .status-ok  { color: #4ade80; font-weight: 700; }
+  .status-err { color: #f87171; font-weight: 700; }
+  .status-404 { color: #fb923c; font-weight: 700; }
+
+  .code { font-family: monospace; font-size: 0.82rem; color: #a5b4fc; }
+
+  /* Toast */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: #e2e8f0;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all .3s;
+    z-index: 1000;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.success { border-color: #22c55e; color: #4ade80; }
+  #toast.error   { border-color: #ef4444; color: #f87171; }
+
+  .log-matched   { color: #4ade80; }
+  .log-unmatched { color: #f87171; }
+
+  .auto-refresh-label { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #64748b; cursor: pointer; }
+  .auto-refresh-label input { width: auto; }
+
+  .path-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .body-cell { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: monospace; font-size: 0.78rem; color: #94a3b8; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>⚡ API Mock Server</h1>
+    <div class="subtitle">Management UI — localhost:8089</div>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Server Panel -->
+  <div class="server-panel">
+    <div>
+      <div style="font-size:0.78rem;color:#64748b;margin-bottom:6px;font-weight:600;letter-spacing:.05em;text-transform:uppercase">Mock Server</div>
+      <span id="status-badge" class="status-badge stopped">STOPPED</span>
+    </div>
+    <div style="margin-left:12px;font-size:0.85rem;color:#94a3b8;" id="port-display"></div>
+    <div class="port-group">
+      <label for="port-input">Port</label>
+      <input type="number" id="port-input" value="9000" min="1024" max="65535" style="width:90px">
+      <button class="btn btn-success" onclick="startServer()">▶ Start</button>
+      <button class="btn btn-danger"  onclick="stopServer()">■ Stop</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('mocks', this)">Mock Rules</button>
+    <button class="tab-btn"        onclick="showTab('logs', this)">Request Logs</button>
+  </div>
+
+  <!-- ── MOCK RULES TAB ── -->
+  <div id="tab-mocks">
+
+    <!-- Add Rule Form -->
+    <div class="card">
+      <h3>Add Mock Rule</h3>
+      <div class="form-grid">
+        <div>
+          <label>Method</label>
+          <select id="f-method">
+            <option>GET</option>
+            <option>POST</option>
+            <option>PUT</option>
+            <option>DELETE</option>
+            <option>PATCH</option>
+          </select>
+        </div>
+        <div>
+          <label>Path (Ant-style: /api/users/*, /api/**)</label>
+          <input type="text" id="f-path" placeholder="/api/users/**">
+        </div>
+        <div>
+          <label>Status</label>
+          <input type="number" id="f-status" value="200" min="100" max="599">
+        </div>
+        <div>
+          <label>Content-Type</label>
+          <input type="text" id="f-content-type" value="application/json">
+        </div>
+        <div class="form-grid-full">
+          <label>Response Body</label>
+          <textarea id="f-body" placeholder='{"message": "ok", "data": []}'></textarea>
+        </div>
+        <div>
+          <label>Delay (ms)</label>
+          <input type="number" id="f-delay" value="0" min="0" max="30000">
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:8px">
+          <button class="btn btn-primary" onclick="addMock()" style="width:100%">Add Rule</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rules Table -->
+    <div class="card">
+      <div class="actions-bar">
+        <h3 style="margin:0">Rules <span id="mock-count" style="color:#64748b;font-weight:400;font-size:0.85rem"></span></h3>
+        <div class="spacer"></div>
+        <button class="btn btn-outline btn-sm" onclick="saveConfig()">💾 Save Config</button>
+        <button class="btn btn-outline btn-sm" onclick="loadConfig()">📂 Load Config</button>
+        <button class="btn btn-danger  btn-sm" onclick="clearAllMocks()">🗑 Clear All</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Method</th>
+              <th>Path</th>
+              <th>Status</th>
+              <th>Content-Type</th>
+              <th>Delay</th>
+              <th>Response Body</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="mocks-body">
+            <tr class="empty-row"><td colspan="7">No mock rules yet. Add one above.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── LOGS TAB ── -->
+  <div id="tab-logs" style="display:none">
+    <div class="card">
+      <div class="actions-bar">
+        <h3 style="margin:0">Request Log <span id="log-count" style="color:#64748b;font-weight:400;font-size:0.85rem"></span></h3>
+        <div class="spacer"></div>
+        <label class="auto-refresh-label">
+          <input type="checkbox" id="auto-refresh" checked> Auto-refresh (3s)
+        </label>
+        <button class="btn btn-outline btn-sm" onclick="loadLogs()">↻ Refresh</button>
+        <button class="btn btn-danger  btn-sm" onclick="clearLogs()">🗑 Clear</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Method</th>
+              <th>Path</th>
+              <th>Status</th>
+              <th>Matched Rule</th>
+            </tr>
+          </thead>
+          <tbody id="logs-body">
+            <tr class="empty-row"><td colspan="5">No requests logged yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+const BASE = '';
+let logRefreshInterval = null;
+
+// ── Toast ────────────────────────────────────────────
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + type;
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => { el.className = ''; }, 3000);
+}
+
+// ── Tab switching ─────────────────────────────────────
+function showTab(name, btn) {
+  document.getElementById('tab-mocks').style.display = name === 'mocks' ? '' : 'none';
+  document.getElementById('tab-logs').style.display  = name === 'logs'  ? '' : 'none';
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  if (name === 'logs') loadLogs();
+}
+
+// ── Server control ────────────────────────────────────
+async function startServer() {
+  const port = parseInt(document.getElementById('port-input').value, 10);
+  const res = await fetch(`${BASE}/api/server/start`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({port})
+  });
+  const data = await res.json();
+  if (data.error) { toast('Error: ' + data.error, 'error'); }
+  else { toast(`Mock server started on port ${port}`); }
+  refreshStatus();
+}
+
+async function stopServer() {
+  await fetch(`${BASE}/api/server/stop`, { method: 'POST' });
+  toast('Mock server stopped', 'error');
+  refreshStatus();
+}
+
+async function refreshStatus() {
+  try {
+    const res = await fetch(`${BASE}/api/server/status`);
+    const data = await res.json();
+    const badge = document.getElementById('status-badge');
+    const portDisplay = document.getElementById('port-display');
+    if (data.running) {
+      badge.textContent = 'RUNNING';
+      badge.className = 'status-badge running';
+      portDisplay.textContent = `→ localhost:${data.port}`;
+    } else {
+      badge.textContent = 'STOPPED';
+      badge.className = 'status-badge stopped';
+      portDisplay.textContent = '';
+    }
+  } catch (e) { /* ignore */ }
+}
+
+// ── Mock Rules ────────────────────────────────────────
+async function loadMocks() {
+  const res = await fetch(`${BASE}/api/mocks`);
+  const mocks = await res.json();
+  renderMocks(mocks);
+}
+
+function renderMocks(mocks) {
+  const tbody = document.getElementById('mocks-body');
+  document.getElementById('mock-count').textContent = `(${mocks.length})`;
+  if (!mocks.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No mock rules yet. Add one above.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = mocks.map(m => `
+    <tr>
+      <td><span class="method-badge ${m.method}">${m.method}</span></td>
+      <td class="code path-cell" title="${escHtml(m.path)}">${escHtml(m.path)}</td>
+      <td class="${statusClass(m.statusCode)}">${m.statusCode}</td>
+      <td style="color:#94a3b8;font-size:0.8rem">${escHtml(m.contentType || '')}</td>
+      <td style="color:#94a3b8">${m.delayMs > 0 ? m.delayMs + 'ms' : '—'}</td>
+      <td class="body-cell" title="${escHtml(m.responseBody || '')}">${escHtml(m.responseBody || '—')}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteMock('${m.id}')">Delete</button></td>
+    </tr>
+  `).join('');
+}
+
+async function addMock() {
+  const method  = document.getElementById('f-method').value;
+  const path    = document.getElementById('f-path').value.trim();
+  const status  = parseInt(document.getElementById('f-status').value, 10);
+  const body    = document.getElementById('f-body').value;
+  const ct      = document.getElementById('f-content-type').value.trim();
+  const delay   = parseInt(document.getElementById('f-delay').value, 10) || 0;
+
+  if (!path) { toast('Path is required', 'error'); return; }
+
+  const res = await fetch(`${BASE}/api/mocks`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ method, path, statusCode: status, responseBody: body, contentType: ct, delayMs: delay })
+  });
+  if (res.ok) {
+    document.getElementById('f-path').value  = '';
+    document.getElementById('f-body').value  = '';
+    document.getElementById('f-status').value = '200';
+    document.getElementById('f-delay').value  = '0';
+    toast('Rule added');
+    loadMocks();
+  } else {
+    toast('Failed to add rule', 'error');
+  }
+}
+
+async function deleteMock(id) {
+  await fetch(`${BASE}/api/mocks/${id}`, { method: 'DELETE' });
+  toast('Rule deleted', 'error');
+  loadMocks();
+}
+
+async function clearAllMocks() {
+  if (!confirm('Clear all mock rules?')) return;
+  await fetch(`${BASE}/api/mocks`, { method: 'DELETE' });
+  toast('All rules cleared', 'error');
+  loadMocks();
+}
+
+// ── Config ────────────────────────────────────────────
+async function saveConfig() {
+  const res = await fetch(`${BASE}/api/config/save`, { method: 'POST' });
+  const data = await res.json();
+  data.error ? toast('Save failed: ' + data.error, 'error') : toast('Saved → mock-config.json');
+}
+
+async function loadConfig() {
+  const res = await fetch(`${BASE}/api/config/load`, { method: 'POST' });
+  const data = await res.json();
+  if (data.error) { toast('Load failed: ' + data.error, 'error'); }
+  else { toast(`Loaded ${data.count} rule(s) from mock-config.json`); loadMocks(); }
+}
+
+// ── Logs ──────────────────────────────────────────────
+async function loadLogs() {
+  const res = await fetch(`${BASE}/api/logs`);
+  const logs = await res.json();
+  renderLogs(logs);
+}
+
+function renderLogs(logs) {
+  const tbody = document.getElementById('logs-body');
+  document.getElementById('log-count').textContent = `(${logs.length})`;
+  if (!logs.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No requests logged yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = logs.map(l => `
+    <tr>
+      <td style="color:#64748b;font-family:monospace;font-size:0.8rem">${l.timestamp}</td>
+      <td><span class="method-badge ${l.method}">${l.method}</span></td>
+      <td class="code path-cell" title="${escHtml(l.path)}">${escHtml(l.path)}</td>
+      <td class="${statusClass(l.responseStatus)}">${l.responseStatus}</td>
+      <td style="font-size:0.78rem;color:${l.matchedRuleId ? '#4ade80' : '#f87171'}">
+        ${l.matchedRuleId ? '✔ ' + l.matchedRuleId.substring(0, 8) + '…' : '✘ No match'}
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function clearLogs() {
+  await fetch(`${BASE}/api/logs`, { method: 'DELETE' });
+  toast('Logs cleared', 'error');
+  loadLogs();
+}
+
+// ── Auto-refresh ──────────────────────────────────────
+function startAutoRefresh() {
+  logRefreshInterval = setInterval(() => {
+    if (document.getElementById('auto-refresh').checked &&
+        document.getElementById('tab-logs').style.display !== 'none') {
+      loadLogs();
+    }
+  }, 3000);
+}
+
+document.getElementById('auto-refresh').addEventListener('change', () => {
+  // handled by interval check above
+});
+
+// ── Helpers ───────────────────────────────────────────
+function statusClass(code) {
+  if (code >= 200 && code < 300) return 'status-ok';
+  if (code === 404) return 'status-404';
+  return 'status-err';
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ── Init ──────────────────────────────────────────────
+refreshStatus();
+loadMocks();
+startAutoRefresh();
+setInterval(refreshStatus, 5000);
+</script>
+</body>
+</html>
